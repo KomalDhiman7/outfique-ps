@@ -21,6 +21,50 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 CORS(app)
 jwt = JWTManager(app)
 
+@app.route('/')
+def home():
+    return jsonify({"message": "Outfique backend is live 🚀"}), 200
+
+@app.route('/api/wardrobe/upload', methods=['POST'])
+@jwt_required()
+def upload_wardrobe_image():
+    if 'image' not in request.files:
+        return jsonify({'message': 'No image uploaded'}), 400
+
+    image = request.files['image']
+    caption = request.form.get('caption', '')
+    user_id = get_jwt_identity()
+
+    if image.filename == '':
+        return jsonify({'message': 'No filename provided'}), 400
+
+    filename = secure_filename(image.filename)
+    save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    image.save(save_path)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    clothing_id = str(uuid.uuid4())
+    image_url = f"/{save_path}"  # you can update this to a proper URL later
+
+    cursor.execute('''
+        INSERT INTO clothing_items (id, user_id, name, category, image_url, tags)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (clothing_id, user_id, caption, 'unspecified', image_url, json.dumps([])))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        'message': 'Wardrobe item uploaded!',
+        'item': {
+            'id': clothing_id,
+            'name': caption,
+            'imageUrl': image_url
+        }
+    }), 201
+
 # Database initialization
 def init_db():
     conn = sqlite3.connect('outfique.db')

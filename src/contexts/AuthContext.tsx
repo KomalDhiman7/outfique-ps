@@ -38,35 +38,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const fetchUser = async () => {
-    try {
-      const response = await api.get('/auth/me');
-      setUser(response.data);
-    } catch (error) {
-      localStorage.removeItem('token');
-      delete api.defaults.headers.common['Authorization'];
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ✅ NO /api here because baseURL already has it
+const login = async (email: string, password: string) => {
+  const response = await api.post('/auth/login', { email, password });
+  const { token, user } = response.data;
 
-  const login = async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
-    const { token, user } = response.data;
-    
-    localStorage.setItem('token', token);
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setUser(user);
-  };
+  localStorage.setItem('token', token);
+  setUser(user);
+};
 
-  const signup = async (username: string, email: string, password: string) => {
+const signup = async (username: string, email: string, password: string) => {
+  try {
     const response = await api.post('/auth/signup', { username, email, password });
+    console.log("Signup response:", response.data);
+
     const { token, user } = response.data;
-    
     localStorage.setItem('token', token);
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     setUser(user);
-  };
+  } catch (error: any) {
+    console.error("Signup failed:", error.response?.data || error.message);
+    throw error; // Let the LoginForm/SignupForm show the error
+  }
+};
+
+
+const fetchUser = async () => {
+  try {
+    const response = await api.get('/auth/me');
+    setUser(response.data);
+  } catch (error) {
+    localStorage.removeItem('token');
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   const logout = () => {
     localStorage.removeItem('token');
