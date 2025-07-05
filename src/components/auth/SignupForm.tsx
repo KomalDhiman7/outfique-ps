@@ -5,7 +5,8 @@ import { Eye, EyeOff, Mail, Lock, User, Shirt } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import LoadingSpinner from '../common/LoadingSpinner';
 
-const SignupForm: React.FC = () => {
+
+function SignupForm() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,14 +30,14 @@ const SignupForm: React.FC = () => {
     }
 
     try {
-      await signup(username, email, password);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Signup failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  await signup(username, email, password);
+  setError('Signup successful! Please check your email to confirm your account.');
+  // Optional: redirect to login after delay
+  // setTimeout(() => navigate('/login'), 3000);
+} catch (err: any) {
+  setError(err.message || 'Signup failed');
+}
+  }
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pastel-50 to-pastel-100 dark:from-dark-900 dark:to-dark-800 px-4">
       <motion.div
@@ -91,8 +92,7 @@ const SignupForm: React.FC = () => {
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     placeholder="Choose a username"
-                    required
-                  />
+                    required />
                 </div>
               </div>
 
@@ -108,8 +108,7 @@ const SignupForm: React.FC = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     placeholder="Enter your email"
-                    required
-                  />
+                    required />
                 </div>
               </div>
 
@@ -125,8 +124,7 @@ const SignupForm: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     placeholder="Create a password"
-                    required
-                  />
+                    required />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -149,8 +147,7 @@ const SignupForm: React.FC = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     placeholder="Confirm your password"
-                    required
-                  />
+                    required />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -192,6 +189,6 @@ const SignupForm: React.FC = () => {
       </motion.div>
     </div>
   );
-};
+}
 
 export default SignupForm;
