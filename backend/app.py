@@ -9,6 +9,16 @@ import os
 from datetime import datetime, timedelta
 import requests
 import json
+import random
+from dotenv import load_dotenv
+load_dotenv()
+from flask import send_from_directory
+
+@app.route('/uploads/<filename>')
+def serve_upload(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
 
 app = Flask(__name__)
 app.config['JWT_SECRET_KEY'] = 'your-secret-key-change-in-production'
@@ -313,6 +323,53 @@ def signup():
         }
     })
 
+@app.route('/api/suggestions', methods=['POST'])
+@jwt_required()
+def generate_suggestions():
+    data = request.get_json()
+    user_id = get_jwt_identity()
+    mood = data.get("mood", "casual")
+    location = data.get("location", "Delhi")  # default fallback
+
+    # Fetch user wardrobe
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM clothing_items WHERE user_id = ?", (user_id,))
+    wardrobe = cursor.fetchall()
+    conn.close()
+
+    if not wardrobe:
+        return jsonify({'message': 'No wardrobe items found'}), 404
+
+    # Weather API (from your other repo)
+    weather_url = f"http://api.weatherapi.com/v1/current.json?key=56c845eb908d61f92aebecf35d8b7802&q={location}&aqi=no"
+    try:
+        weather_res = requests.get(weather_url).json()
+        temperature = weather_res['current']['temp_c']
+        condition = weather_res['current']['condition']['text']
+    except Exception as e:
+        return jsonify({'message': 'Weather API failed', 'error': str(e)}), 500
+
+    # Mock logic – replace with ML later
+    suggestion = {
+        return jsonify({
+    "mood": mood,
+    "weather": {
+        "location": location,
+        "condition": weather_condition,
+        "temperature": temperature,
+        "humidity": humidity
+    },
+    "outfit": suggested_outfit  # a list of dicts with id, name, imageUrl, category
+})
+        'occasion': 'Casual Day Out',
+        'confidence': 0.85,
+        'items': [],
+        'buyLinks': []
+    }
+
+    return jsonify(suggestion), 200
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -576,47 +633,88 @@ def get_wardrobe_suggestions():
     
     return jsonify(suggestions)
 
-@app.route('/api/suggestions/weather', methods=['GET'])
+@app.route('/api/suggestions/weather', methods=['POST'])
 @jwt_required()
-def get_weather_suggestions():
-    # Mock weather data and suggestions
-    weather_data = {
-        'location': 'New York, NY',
-        'temperature': 22,
-        'condition': 'Partly Cloudy',
-        'humidity': 60,
-        'windSpeed': 10
+def generate_outfit_suggestions():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    location = data.get('location')
+    mood = data.get('mood', 'casual').lower()
+
+    if not location:
+        return jsonify({'message': 'Location is required'}), 400
+
+    # ⛅️ Fetch weather
+    weather_api_key = os.getenv("WEATHER_API_KEY")
+    weather_url = f"https://api.openweathermap.org/data/2.5/weather"
+    response = requests.get(weather_url, params={
+        'q': location,
+        'appid': WEATHER_API_KEY,
+        'units': 'metric'
+    })
+
+    if response.status_code != 200:
+        return jsonify({'message': 'Weather fetch failed'}), 500
+
+    weather = response.json()
+    temperature = weather['main']['temp']
+    condition = weather['weather'][0]['main'].lower()
+
+    # 🧥 Fetch user wardrobe
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM clothing_items WHERE user_id = ?', (user_id,))
+    wardrobe = cursor.fetchall()
+    conn.close()
+
+    # 🧠 Mood preference map
+    mood_map = {
+        'date night': {'top': 'black', 'bottom': 'skirt', 'shoe': 'heel'},
+        'chill': {'top': 'hoodie', 'bottom': 'jogger', 'shoe': 'sneaker'},
+        'interview': {'top': 'shirt', 'bottom': 'pant', 'shoe': 'formal'},
+        'party': {'top': 'crop', 'bottom': 'jeans', 'shoe': 'heel'},
+        'casual': {}
     }
-    
-    suggestions = [
-        {
-            'id': str(uuid.uuid4()),
-            'occasion': 'Perfect for Today\'s Weather',
-            'confidence': 0.88,
-            'weather': 'Partly Cloudy, 22°C',
-            'items': [
-                {
-                    'id': str(uuid.uuid4()),
-                    'name': 'Light Cardigan',
-                    'category': 'outerwear',
-                    'color': 'beige',
-                    'imageUrl': 'https://images.pexels.com/photos/1040173/pexels-photo-1040173.jpeg'
-                },
-                {
-                    'id': str(uuid.uuid4()),
-                    'name': 'Cotton Dress',
-                    'category': 'dress',
-                    'color': 'floral',
-                    'imageUrl': 'https://images.pexels.com/photos/1926769/pexels-photo-1926769.jpeg'
-                }
-            ],
-            'buyLinks': []
-        }
-    ]
-    
+
+    mood_pref = mood_map.get(mood, {})
+
+    # 📦 Categorize items
+    tops, bottoms, shoes = [], [], []
+    for item in wardrobe:
+        name = item['name'].lower()
+        if 'top' in name or 'shirt' in name or 'tee' in name or 'crop' in name:
+            tops.append(item)
+        elif 'jean' in name or 'pant' in name or 'skirt' in name or 'bottom' in name:
+            bottoms.append(item)
+        elif 'shoe' in name or 'sneaker' in name or 'heel' in name:
+            shoes.append(item)
+
+    def pick_best(items, keyword=''):
+        filtered = [i for i in items if keyword in i['name'].lower()] if keyword else items
+        return random.choice(filtered) if filtered else None
+
+    top = pick_best(tops, mood_pref.get('top', ''))
+    bottom = pick_best(bottoms, mood_pref.get('bottom', ''))
+    shoe = pick_best(shoes, mood_pref.get('shoe', ''))
+
+    outfit_items = []
+    for item in [top, bottom, shoe]:
+        if item:
+            outfit_items.append({
+                'id': item['id'],
+                'name': item['name'],
+                'category': item['category'],
+                'imageUrl': item['image_url']
+            })
+
     return jsonify({
-        'weather': weather_data,
-        'suggestions': suggestions
+        'weather': {
+            'location': location,
+            'temperature': temperature,
+            'condition': condition
+        },
+        'mood': mood,
+        'outfit': outfit_items
     })
 
 @app.route('/api/notifications', methods=['GET'])
